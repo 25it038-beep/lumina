@@ -1,0 +1,41 @@
+{
+  "name": "lumina-present",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lumina — production-grade AI presentation platform. Generate, edit, animate and export beautiful presentations.",
+  "scripts": {
+    "dev": "next dev",
+    "backend": "cd backend && python main.py",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "clean": "powershell -Command \"Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; Write-Host 'Cache cleared'\"",
+    "fresh": "powershell -Command \"Stop-Process -Name node -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; npm run dev\""
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^7.7.0",
+    "fabric": "^6.5.4",
+    "firebase": "^12.17.1",
+    "framer-motion": "^11.18.2",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.2",
+    "lucide-react": "^0.474.0",
+    "next": "^15.1.6",
+    "openai": "^7.4.0",
+    "pptxgenjs": "^3.12.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sonner": "^1.7.4",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3"
+  }
+}
