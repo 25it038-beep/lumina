@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+build
+.git
+.gitignore
+*.md
+.env
+.env.*
+!.env.example
+dev-server*.log
+dev.log
+ui-check.log
+Dockerfile
+.dockerignore
+.agents
+backend/__pycache__
