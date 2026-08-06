@@ -21,4 +21,10 @@ export const config = {
     '/__clerk/:path*',
     '/(api|trpc)(.*)',
   ],
+  // Run middleware on the Node.js runtime instead of Edge. This avoids the
+  // Vercel Edge Function analyzer rejecting Clerk's package-internal subpath
+  // imports (#crypto, #safe-node-apis, @clerk/shared/*), which caused:
+  //   "The Edge Function 'middleware' is referencing unsupported modules"
+  // clerkMiddleware() fully supports the Node.js middleware runtime.
+  runtime: "nodejs",
 }
