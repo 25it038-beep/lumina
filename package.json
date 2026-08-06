@@ -5,8 +5,10 @@
   "description": "Lumina — production-grade AI presentation platform. Generate, edit, animate and export beautiful presentations.",
   "scripts": {
     "dev": "next dev",
-    "backend": "cd backend && python main.py",
+    "prebuild": "npm install",
     "build": "next build",
+    "vercel-build": "next build",
+    "backend": "cd backend && python main.py",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
