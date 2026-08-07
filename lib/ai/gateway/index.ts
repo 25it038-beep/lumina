@@ -6,5 +6,7 @@ export { ModelRouter } from "./ModelRouter";
 export type { AITaskType, ModelTarget } from "./ModelRouter";
 export { NVIDIA_MODELS, GptOssProvider, DeepSeekV4Provider, FluxSchnellProvider } from "./NvidiaProviders";
 export type { NVIDIAConfig } from "./NvidiaProviders";
+export { SAMBANOVA_MODELS, SambaNovaProvider } from "./SambaNovaProvider";
+export type { SambaNovaConfig } from "./SambaNovaProvider";
 export { OllamaProvider, ollamaProvider, OLLAMA_URL } from "./OllamaProvider";
 export type { OllamaConfig } from "./OllamaProvider";

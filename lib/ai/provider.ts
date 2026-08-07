@@ -4,6 +4,7 @@ export type ProviderId =
   | "gemini"
   | "openrouter"
   | "deepseek"
+  | "sambanova"
   | "ollama"
   | "llama"
   | "nvidia-llama-3.3-70b"
@@ -73,6 +74,13 @@ export const PROVIDERS: ProviderInfo[] = [
     models: ["deepseek-chat", "deepseek-reasoner"],
     needsKey: true,
     baseUrl: "https://api.deepseek.com/v1",
+  },
+  {
+    id: "sambanova",
+    label: "SambaNova",
+    models: ["DeepSeek-V3.1"],
+    needsKey: true,
+    baseUrl: "https://api.sambanova.ai/v1",
   },
   {
     id: "ollama",

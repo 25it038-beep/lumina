@@ -22,8 +22,14 @@ export function calculateCostUSD(model: string, promptTokens: number, completion
   if (model.includes("gpt-oss")) {
     return (promptTokens / 1000) * 0.001 + (completionTokens / 1000) * 0.002;
   }
+  if (model.includes("gpt-oss")) {
+    return (promptTokens / 1000) * 0.001 + (completionTokens / 1000) * 0.002;
+  }
   if (model.includes("deepseek")) {
     return (promptTokens / 1000) * 0.0008 + (completionTokens / 1000) * 0.0016;
+  }
+  if (model.includes("sambanova")) {
+    return (promptTokens / 1000) * 0.0008 + (completionTokens / 1000) * 0.0024;
   }
   if (model.includes("flux")) {
     return 0.003; // fixed cost per image request

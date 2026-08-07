@@ -14,8 +14,16 @@ export type AITaskType =
   | "translate_text";
 
 export interface ModelTarget {
-  primaryModel: "ensemble (Llama 3.3 + DeepSeek V4)" | "meta/llama-3.3-70b-instruct" | "gpt-oss-20b" | "deepseek-v4-pro" | "flux-1-schnell" | "local";
-  fallbackModel: "meta/llama-3.3-70b-instruct" | "deepseek-v4-pro" | "gpt-oss-20b" | "local";
+  primaryModel:
+    | "ensemble (Llama 3.3 + DeepSeek V4 + SambaNova V3.1)"
+    | "ensemble (Llama 3.3 + DeepSeek V4)"
+    | "meta/llama-3.3-70b-instruct"
+    | "gpt-oss-20b"
+    | "deepseek-v4-pro"
+    | "sambanova-deepseek-v3.1"
+    | "flux-1-schnell"
+    | "local";
+  fallbackModel: "meta/llama-3.3-70b-instruct" | "deepseek-v4-pro" | "gpt-oss-20b" | "sambanova-deepseek-v3.1" | "local";
   description: string;
 }
 

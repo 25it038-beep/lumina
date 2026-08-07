@@ -1,4 +1,5 @@
 import { GptOssProvider, DeepSeekV4Provider, FluxSchnellProvider, Llama33_70bProvider } from "./NvidiaProviders";
+import { SambaNovaProvider } from "./SambaNovaProvider";
 import { OllamaProvider } from "./OllamaProvider";
 import { ModelRouter, AITaskType } from "./ModelRouter";
 import {
@@ -11,7 +12,7 @@ import {
 } from "./GatewayUtilities";
 import { buildClient } from "../provider";
 import { generateOutline, generateContent } from "../localEngine";
-import { dedupeOutlineSlides, synthesizeDualContent } from "../contentEnrichment";
+import { dedupeOutlineSlides, synthesizeDualContent, synthesizeTripleContent } from "../contentEnrichment";
 
 export interface GatewayExecutionOptions {
   signal?: AbortSignal;
@@ -29,6 +30,7 @@ export class AIGateway {
   private llama33 = new Llama33_70bProvider();
   private gptOss = new GptOssProvider();
   private deepseek = new DeepSeekV4Provider();
+  private samba = new SambaNovaProvider();
   private flux = new FluxSchnellProvider();
   private ollama = new OllamaProvider();
 
@@ -93,30 +95,38 @@ export class AIGateway {
     }
 
     let responseText = "";
-    let usedModel = target.primaryModel;
+    let usedModel: string = target.primaryModel;
     let status: GatewayLog["status"] = "success";
     let errorMsg: string | undefined;
 
-    // Primary Provider Execution with Dual-Model Parallel Ensemble (Llama 3.3 70B + DeepSeek V4 Pro)
+    // Primary Provider Execution with Triple-Model Parallel Ensemble
+    // (Llama 3.3 70B + DeepSeek V4 Pro + SambaNova DeepSeek-V3.1).
+    // The second and third writers get complementary-role directives so the
+    // drafts cover different angles instead of repeating each other.
     try {
       if (task === "write_content" || task === "generate_outline") {
-        // The second writer gets a complementary-role directive so the drafts
-        // cover different angles instead of repeating each other.
+        const complementaryDirective =
+          "You are a SECOND writer in a multi-model ensemble. Write a COMPLEMENTARY draft: contribute DIFFERENT insights, statistics, key takeaways and bullets the first writer likely missed. Do NOT repeat the first draft's phrasing or points — take a distinct angle and keep every point specific.";
+        const thirdWriterDirective =
+          "You are a THIRD writer in a multi-model ensemble. Write a CONTRASTING draft: contribute FRESH evidence, examples, numbers and angles that neither of the other writers covered. Avoid repeating their phrasing or points entirely — your job is to make the final blend richer, not similar.";
+
         const llamaMsgs =
           task === "write_content"
-            ? [
-                ...messages,
-                {
-                  role: "user",
-                  content:
-                    "You are the SECOND writer in a two-model ensemble. Write a COMPLEMENTARY draft: contribute DIFFERENT insights, statistics, key takeaways and bullets the first writer likely missed. Do NOT repeat the first draft's phrasing or points — take a distinct angle and keep every point specific.",
-                },
-              ]
+            ? [...messages, { role: "user", content: complementaryDirective }]
             : messages;
-        const [llamaRes, deepseekRes] = await Promise.allSettled([
+        const sambaMsgs =
+          task === "write_content"
+            ? [...messages, { role: "user", content: thirdWriterDirective }]
+            : messages;
+
+        const calls: Promise<string>[] = [
           this.llama33.chat(llamaMsgs, { signal: options.signal }),
           this.deepseek.chat(messages, { signal: options.signal }),
-        ]);
+        ];
+        if (this.samba.isConfigured) {
+          calls.push(this.samba.chat(sambaMsgs, { signal: options.signal }));
+        }
+        const [llamaRes, deepseekRes, sambaRes] = await Promise.allSettled(calls);
 
         const parseDraft = (raw: string): any | null => {
           try {
@@ -142,46 +152,106 @@ export class AIGateway {
           }
         };
 
-        if (llamaRes.status === "fulfilled" && deepseekRes.status === "fulfilled") {
-          const llamaObj = parseDraft(llamaRes.value);
-          const deepseekObj = parseDraft(deepseekRes.value);
-          if (llamaObj && deepseekObj) {
-            // LLaMA + DeepSeek Dual Synthesis: blend both drafts and return
-            // the best combined content output for the slide.
-            const blended =
-              task === "write_content"
-                ? synthesizeDualContent(llamaObj, deepseekObj)
-                : {
-                    ...deepseekObj,
-                    ...llamaObj,
-                    title: llamaObj.title || deepseekObj.title,
-                    subtitle: llamaObj.subtitle || deepseekObj.subtitle,
-                    slides: dedupeOutlineSlides(
-                      (Array.isArray(llamaObj.slides) ? llamaObj.slides : []).concat(
-                        Array.isArray(deepseekObj.slides) ? deepseekObj.slides : []
-                      )
-                    ),
-                  };
-            responseText = JSON.stringify(blended);
-            usedModel = "ensemble (Llama 3.3 + DeepSeek V4)";
-          } else if (deepseekObj) {
-            responseText = JSON.stringify(deepseekObj);
-            usedModel = "deepseek-v4-pro";
-          } else if (llamaObj) {
-            responseText = JSON.stringify(llamaObj);
-            usedModel = "meta/llama-3.3-70b-instruct";
-          } else {
-            responseText = deepseekRes.value || llamaRes.value;
-            usedModel = "deepseek-v4-pro";
-          }
-        } else if (llamaRes.status === "fulfilled") {
-          responseText = llamaRes.value;
-          usedModel = "meta/llama-3.3-70b-instruct";
-        } else if (deepseekRes.status === "fulfilled") {
-          responseText = deepseekRes.value;
+        const llamaObj = llamaRes.status === "fulfilled" ? parseDraft(llamaRes.value) : null;
+        const deepseekObj = deepseekRes.status === "fulfilled" ? parseDraft(deepseekRes.value) : null;
+        const sambaObj =
+          sambaRes && sambaRes.status === "fulfilled" ? parseDraft(sambaRes.value) : null;
+
+        const fulfillCount = [llamaRes, deepseekRes, sambaRes].filter(
+          (r): r is PromiseFulfilledResult<string> => !!r && r.status === "fulfilled"
+        ).length;
+
+        if (llamaObj && deepseekObj && sambaObj && fulfillCount >= 3) {
+          // Triple synthesis: LLaMA + DeepSeek + SambaNova blend.
+          const blended =
+            task === "write_content"
+              ? synthesizeTripleContent(llamaObj, deepseekObj, sambaObj)
+              : {
+                  ...deepseekObj,
+                  ...llamaObj,
+                  ...sambaObj,
+                  title: llamaObj.title || deepseekObj.title || sambaObj.title,
+                  subtitle: llamaObj.subtitle || deepseekObj.subtitle || sambaObj.subtitle,
+                  slides: dedupeOutlineSlides(
+                    (Array.isArray(llamaObj.slides) ? llamaObj.slides : [])
+                      .concat(Array.isArray(deepseekObj.slides) ? deepseekObj.slides : [])
+                      .concat(Array.isArray(sambaObj.slides) ? sambaObj.slides : [])
+                  ),
+                };
+          responseText = JSON.stringify(blended);
+          usedModel = "ensemble (Llama 3.3 + DeepSeek V4 + SambaNova V3.1)";
+        } else if (llamaObj && deepseekObj) {
+          // LLaMA + DeepSeek Dual Synthesis: blend both drafts and return
+          // the best combined content output for the slide.
+          const blended =
+            task === "write_content"
+              ? synthesizeDualContent(llamaObj, deepseekObj)
+              : {
+                  ...deepseekObj,
+                  ...llamaObj,
+                  title: llamaObj.title || deepseekObj.title,
+                  subtitle: llamaObj.subtitle || deepseekObj.subtitle,
+                  slides: dedupeOutlineSlides(
+                    (Array.isArray(llamaObj.slides) ? llamaObj.slides : []).concat(
+                      Array.isArray(deepseekObj.slides) ? deepseekObj.slides : []
+                    )
+                  ),
+                };
+          responseText = JSON.stringify(blended);
+          usedModel = "ensemble (Llama 3.3 + DeepSeek V4)";
+        } else if (deepseekObj && sambaObj) {
+          const blended =
+            task === "write_content"
+              ? synthesizeDualContent(deepseekObj, sambaObj)
+              : {
+                  ...deepseekObj,
+                  ...sambaObj,
+                  title: deepseekObj.title || sambaObj.title,
+                  subtitle: deepseekObj.subtitle || sambaObj.subtitle,
+                  slides: dedupeOutlineSlides(
+                    (Array.isArray(deepseekObj.slides) ? deepseekObj.slides : []).concat(
+                      Array.isArray(sambaObj.slides) ? sambaObj.slides : []
+                    )
+                  ),
+                };
+          responseText = JSON.stringify(blended);
+          usedModel = "ensemble (DeepSeek V4 + SambaNova V3.1)";
+        } else if (llamaObj && sambaObj) {
+          const blended =
+            task === "write_content"
+              ? synthesizeDualContent(llamaObj, sambaObj)
+              : {
+                  ...llamaObj,
+                  ...sambaObj,
+                  title: llamaObj.title || sambaObj.title,
+                  subtitle: llamaObj.subtitle || sambaObj.subtitle,
+                  slides: dedupeOutlineSlides(
+                    (Array.isArray(llamaObj.slides) ? llamaObj.slides : []).concat(
+                      Array.isArray(sambaObj.slides) ? sambaObj.slides : []
+                    )
+                  ),
+                };
+          responseText = JSON.stringify(blended);
+          usedModel = "ensemble (Llama 3.3 + SambaNova V3.1)";
+        } else if (deepseekObj) {
+          responseText = JSON.stringify(deepseekObj);
           usedModel = "deepseek-v4-pro";
+        } else if (llamaObj) {
+          responseText = JSON.stringify(llamaObj);
+          usedModel = "meta/llama-3.3-70b-instruct";
+        } else if (sambaObj) {
+          responseText = JSON.stringify(sambaObj);
+          usedModel = "sambanova-deepseek-v3.1";
         } else {
-          throw new Error("Both Llama 3.3 and DeepSeek V4 providers failed.");
+          const winner = [llamaRes, deepseekRes, sambaRes]
+            .filter((r): r is PromiseFulfilledResult<string> => !!r && r.status === "fulfilled")
+            .sort((a, b) => b.value.length - a.value.length)[0];
+          if (winner) {
+            responseText = winner.value;
+            usedModel = "deepseek-v4-pro";
+          } else {
+            throw new Error("All Llama 3.3, DeepSeek V4 and SambaNova providers failed.");
+          }
         }
       } else if (target.primaryModel === "gpt-oss-20b") {
         responseText = await this.gptOss.chat(messages, { signal: options.signal });
@@ -197,8 +267,13 @@ export class AIGateway {
           responseText = await this.llama33.chat(messages, { signal: options.signal });
           usedModel = "meta/llama-3.3-70b-instruct";
         } catch {
-          responseText = await this.deepseek.chat(messages, { signal: options.signal });
-          usedModel = "deepseek-v4-pro";
+          try {
+            responseText = await this.deepseek.chat(messages, { signal: options.signal });
+            usedModel = "deepseek-v4-pro";
+          } catch {
+            responseText = await this.samba.chat(messages, { signal: options.signal });
+            usedModel = "sambanova-deepseek-v3.1";
+          }
         }
       } catch (fbErr: any) {
         status = "error";

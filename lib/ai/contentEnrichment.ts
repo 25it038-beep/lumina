@@ -146,7 +146,12 @@ function stripFiller(s: string): string {
  *  - picks the richer scalar (longer, non-empty) from whichever model wrote it
  *    better.
  */
-export function mergeContentDrafts(primary: any, secondary: any): any {
+export function mergeContentDrafts(primary: any, secondary: any, tertiary?: any): any {
+  const two = mergeTwoDrafts(primary, secondary);
+  return tertiary && typeof tertiary === "object" ? mergeTwoDrafts(two, tertiary) : two;
+}
+
+function mergeTwoDrafts(primary: any, secondary: any): any {
   const p = primary && typeof primary === "object" ? primary : {};
   const s = secondary && typeof secondary === "object" ? secondary : {};
   const out: any = { ...p };
@@ -255,5 +260,22 @@ export function synthesizeDualContent(llamaDraft: any, deepseekDraft: any): any 
     return (["bullets", "paragraphs", "keyPoints", "stats", "metrics", "facts", "cards", "steps", "timeline", "nodes", "references", "tableRows", "comparison"] as const).reduce((sum, k) => sum + count(k), 0);
   };
   const best = score(deepseekDraft) >= score(llamaDraft) ? deepseekDraft : llamaDraft;
+  return score(blended) >= score(best) ? blended : best;
+}
+
+/**
+ * Triple-synthesis entry point for the content-writing ensemble
+ * (LLaMA 3.3 + DeepSeek V4 + SambaNova DeepSeek-V3.1). Merges all three
+ * drafts into one best-quality content object, falling back to whichever
+ * single draft is richest if the three-way blend comes out thin.
+ */
+export function synthesizeTripleContent(llamaDraft: any, deepseekDraft: any, sambaDraft: any): any {
+  const blended = mergeContentDrafts(deepseekDraft ?? {}, llamaDraft ?? {}, sambaDraft ?? {});
+  const score = (o: any): number => {
+    const count = (k: string) => (Array.isArray(o?.[k]) ? (o[k] as any[]).length : typeof o?.[k] === "string" && (o[k] as string) ? 1 : 0);
+    return (["bullets", "paragraphs", "keyPoints", "stats", "metrics", "facts", "cards", "steps", "timeline", "nodes", "references", "tableRows", "comparison"] as const).reduce((sum, k) => sum + count(k), 0);
+  };
+  const candidates = [llamaDraft, deepseekDraft, sambaDraft].filter(Boolean);
+  const best = candidates.reduce((a, b) => (score(b) > score(a) ? b : a), candidates[0] ?? {});
   return score(blended) >= score(best) ? blended : best;
 }
