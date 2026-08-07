@@ -1,38 +1,30 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
-const isPublicRoute = createRouteMatcher([
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/welcome(.*)",
-  "/",
-]);
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)'])
 
 export default clerkMiddleware(async (auth, req) => {
-  // Allow public routes through without authentication
-  if (isPublicRoute(req)) {
-    return NextResponse.next();
+  if (!isPublicRoute(req)) {
+    const session = await auth()
+    if (!session.userId) {
+      // Signed-out visitors are sent to the sign-in page. After authenticating
+      // they land on the welcome page (logo + tagline), from which they can
+      // enter the app.
+      return session.redirectToSignIn({ returnBackUrl: "/welcome" })
+    }
   }
-
-  // Protect all other routes — unauthenticated users are redirected to sign-in
-  const { userId, redirectToSignIn } = await auth();
-  if (!userId) {
-    return redirectToSignIn({ returnBackUrl: req.url });
-  }
-
-  return NextResponse.next();
-});
+})
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths EXCEPT:
-     * - _next/static  (static files)
-     * - _next/image   (image optimization)
-     * - favicon.ico, logo.png, and other static assets
-     * - public folder assets
-     */
-    "/((?!_next/static|_next/image|favicon\\.ico|logo\\.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|woff2?|ttf)).*)",
-    "/(api|trpc)(.*)",
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Always run for Clerk's auto-proxy path
+    '/__clerk/:path*',
+    '/(api|trpc)(.*)',
   ],
-};
+  // Run middleware on the Node.js runtime instead of Edge. This avoids the
+  // Vercel Edge Function analyzer rejecting Clerk's package-internal subpath
+  // imports (#crypto, #safe-node-apis, @clerk/shared/*), which caused:
+  //   "The Edge Function 'middleware' is referencing unsupported modules"
+  // clerkMiddleware() fully supports the Node.js middleware runtime.
+  runtime: "nodejs",
+}
