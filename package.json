@@ -5,15 +5,11 @@
   "description": "Lumina — production-grade AI presentation platform. Generate, edit, animate and export beautiful presentations.",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "npm install",
     "build": "next build",
-    "vercel-build": "next build",
-    "backend": "cd backend && python main.py",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "clean": "powershell -Command \"Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; Write-Host 'Cache cleared'\"",
-    "fresh": "powershell -Command \"Stop-Process -Name node -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; npm run dev\""
+    "backend": "cd backend && python main.py"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.0",

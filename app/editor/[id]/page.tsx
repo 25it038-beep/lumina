@@ -15,7 +15,6 @@ import { SlideSorterView } from "@/components/editor/SlideSorterView";
 import { OutlineView } from "@/components/editor/OutlineView";
 import { NotesPane } from "@/components/editor/NotesPane";
 import { CommandPalette } from "@/components/editor/CommandPalette";
-import { CollaborationBar } from "@/components/editor/CollaborationBar";
 import { AIAssistant } from "@/components/editor/AIAssistant";
 import { EditorTutorial, START_TOUR_EVENT } from "@/components/editor/EditorTutorial";
 import { ElementTutorialModal } from "@/components/editor/ElementTutorialModal";
@@ -208,7 +207,6 @@ export default function EditorPage() {
         <span className="font-medium text-slate-400">Lumina</span>
         <span>{deck.slides.length} slides</span>
         <span className="capitalize">{deck.themeId} theme</span>
-        <CollaborationBar />
         <span className="flex-1" />
         <span>View: <span className="text-slate-300">{view}</span></span>
         <span className="hidden lg:inline">Ctrl+K — commands</span>

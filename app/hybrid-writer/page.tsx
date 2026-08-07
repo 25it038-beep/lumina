@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { useState, useEffect } from "react";
 import { MultiAgentOrchestrator, OrchestrationResult, AgentStageStatus, AgentStageId } from "@/lib/ai/agents/orchestrator";
 import { analyzeDocumentQuality, DocumentQualityMetrics } from "@/lib/ai/quality/qualityAnalyzer";

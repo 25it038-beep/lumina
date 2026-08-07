@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useRouter } from "next/navigation";
 import { ArrowRight, Sparkles, LayoutTemplate, FileDown } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
